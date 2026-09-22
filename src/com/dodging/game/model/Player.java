@@ -15,8 +15,10 @@ public class Player {
     private final double radius;
     private final double speed;
 
-    // 무적 상태 (게임 시작 시 1.5초간 안전)
-    private long invincibleEndTime = 0;
+    // 무적 상태 (게임 시작 시 1.5초간 안전) - 프레임 단위로 관리하여 일시정지 중에는 줄어들지 않음
+    private int invincibleFrames = 0;
+    private int animTick = 0;
+    private boolean fever = false;
 
     public Player(double startX, double startY) {
         this.x = startX;
@@ -29,6 +31,11 @@ public class Player {
      * 키 입력에 따른 플레이어 위치 업데이트 및 이동 잔상 파티클 생성
      */
     public void update(boolean up, boolean down, boolean left, boolean right, int screenWidth, int screenHeight, List<Particle> particles) {
+        animTick++;
+        if (invincibleFrames > 0) {
+            invincibleFrames--;
+        }
+
         double dx = 0;
         double dy = 0;
 
@@ -55,7 +62,7 @@ public class Player {
                         x + (RANDOM.nextDouble() - 0.5) * 6,
                         y + (RANDOM.nextDouble() - 0.5) * 6,
                         pvx, pvy, 4.0, 0.7f, 0.05f,
-                        new Color(0, 229, 255)
+                        fever ? new Color(255, 200, 60) : new Color(0, 229, 255)
                 ));
             }
         }
@@ -78,11 +85,22 @@ public class Player {
     }
 
     public boolean isInvincible() {
-        return System.currentTimeMillis() < invincibleEndTime;
+        return invincibleFrames > 0;
     }
 
-    public void setInvincibleDuration(long durationMs) {
-        this.invincibleEndTime = System.currentTimeMillis() + durationMs;
+    public void setInvincibleFrames(int frames) {
+        this.invincibleFrames = frames;
+    }
+
+    /** 상단 HUD 영역으로 들어가지 않도록 최소 Y 좌표 제한 */
+    public void clampMinY(double minY) {
+        if (y < minY) {
+            y = minY;
+        }
+    }
+
+    public void setFever(boolean fever) {
+        this.fever = fever;
     }
 
     /**
@@ -91,7 +109,7 @@ public class Player {
     public void draw(Graphics2D g2d) {
         // 무적 시간 동안은 깜빡임 연출
         if (isInvincible()) {
-            if ((System.currentTimeMillis() / 100) % 2 == 0) {
+            if ((animTick / 6) % 2 == 0) {
                 return;
             }
         }
@@ -99,6 +117,19 @@ public class Player {
         int drawX = (int) Math.round(x - radius);
         int drawY = (int) Math.round(y - radius);
         int diameter = (int) Math.round(radius * 2);
+
+        // 피버 중에는 금색 오라가 회전
+        if (fever) {
+            double pulse = 6 + Math.sin(animTick * 0.2) * 3;
+            int auraD = (int) Math.round(diameter + pulse * 2 + 6);
+            g2d.setColor(new Color(255, 200, 60, 50));
+            g2d.fillOval((int) Math.round(x - auraD / 2.0), (int) Math.round(y - auraD / 2.0), auraD, auraD);
+            g2d.setColor(new Color(255, 215, 90, 200));
+            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int ringD = diameter + 12;
+            g2d.drawArc((int) Math.round(x - ringD / 2.0), (int) Math.round(y - ringD / 2.0), ringD, ringD, animTick * 6, 110);
+            g2d.drawArc((int) Math.round(x - ringD / 2.0), (int) Math.round(y - ringD / 2.0), ringD, ringD, animTick * 6 + 180, 110);
+        }
 
         // 외부 네온 글로우 효과
         g2d.setColor(new Color(0, 229, 255, 60));
@@ -136,6 +167,8 @@ public class Player {
     public void reset(double startX, double startY) {
         this.x = startX;
         this.y = startY;
-        setInvincibleDuration(1500); // 리셋 시 1.5초 무적
+        this.fever = false;
+        this.animTick = 0;
+        setInvincibleFrames(90); // 리셋 시 1.5초(90프레임) 무적
     }
 }
