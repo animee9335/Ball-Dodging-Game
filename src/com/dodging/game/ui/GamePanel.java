@@ -1,11 +1,14 @@
 package com.dodging.game.ui;
 
+import com.dodging.game.model.Ball;
 import com.dodging.game.model.GameState;
 import com.dodging.game.model.Player;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 게임 메인 렌더링 및 게임 루프를 처리하는 패널
@@ -21,6 +24,13 @@ public class GamePanel extends JPanel implements ActionListener {
 
     // 플레이어 객체
     private final Player player;
+
+    // 공 리스트
+    private final List<Ball> balls = new ArrayList<>();
+
+    // 공 스폰 주기 관리
+    private int spawnCounter = 0;
+    private int spawnInterval = 25; // 25프레임마다 1개 스폰 (약 0.4초)
 
     // 키 입력 플래그
     private boolean upPressed = false;
@@ -52,7 +62,7 @@ public class GamePanel extends JPanel implements ActionListener {
             }
         });
 
-        // 포커스를 잃었을 때 키 상태 초기화 (계속 이동하는 현상 방지)
+        // 포커스를 잃었을 때 키 상태 초기화
         addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
@@ -115,8 +125,15 @@ public class GamePanel extends JPanel implements ActionListener {
 
     public void startGame() {
         player.reset(PANEL_WIDTH / 2.0, PANEL_HEIGHT / 2.0);
+        balls.clear();
+        spawnCounter = 0;
         resetKeyStates();
         gameState = GameState.PLAYING;
+    }
+
+    private void triggerGameOver() {
+        gameState = GameState.GAME_OVER;
+        resetKeyStates();
     }
 
     public GameState getGameState() {
@@ -131,6 +148,10 @@ public class GamePanel extends JPanel implements ActionListener {
         return player;
     }
 
+    public List<Ball> getBalls() {
+        return balls;
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         if (gameState == GameState.PLAYING) {
@@ -140,8 +161,30 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     private void updateGame() {
-        // 플레이어 위치 업데이트 (방향키 조작)
+        // 1. 플레이어 위치 업데이트 (방향키 조작)
         player.update(upPressed, downPressed, leftPressed, rightPressed, PANEL_WIDTH, PANEL_HEIGHT);
+
+        // 2. 공 스폰 관리
+        spawnCounter++;
+        if (spawnCounter >= spawnInterval) {
+            spawnCounter = 0;
+            balls.add(Ball.createRandomBall(PANEL_WIDTH, PANEL_HEIGHT, 1.0, player.getX(), player.getY()));
+        }
+
+        // 3. 공 이동 및 충돌 판정
+        for (int i = 0; i < balls.size(); i++) {
+            Ball ball = balls.get(i);
+            ball.update();
+
+            // 충돌 감지
+            if (ball.collidesWith(player)) {
+                triggerGameOver();
+                return;
+            }
+        }
+
+        // 4. 화면 밖으로 벗어난 공 제거
+        balls.removeIf(b -> b.isOutOfBounds(PANEL_WIDTH, PANEL_HEIGHT));
     }
 
     @Override
@@ -153,14 +196,16 @@ public class GamePanel extends JPanel implements ActionListener {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        // 게임 화면 및 플레이어 렌더링
-        if (gameState != GameState.READY) {
-            player.draw(g2d);
+        // 공 렌더링
+        for (Ball ball : balls) {
+            ball.draw(g2d);
         }
+
+        // 플레이어 렌더링
+        player.draw(g2d);
 
         // 상태별 오버레이 화면 렌더링
         if (gameState == GameState.READY) {
-            player.draw(g2d);
             drawReadyScreen(g2d);
         } else if (gameState == GameState.PAUSED) {
             drawPausedScreen(g2d);
