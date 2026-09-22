@@ -40,8 +40,9 @@ public class Ball {
      * @param speedMultiplier 난이도에 따른 속도 배율
      * @param targetX 유인 타겟 X 좌표 (플레이어 위치 등)
      * @param targetY 유인 타겟 Y 좌표 (플레이어 위치 등)
+     * @param spread 조준 편차(px) - 난이도가 높을수록 작아져 더 정확히 날아옴
      */
-    public static Ball createRandomBall(int screenWidth, int screenHeight, double speedMultiplier, double targetX, double targetY) {
+    public static Ball createRandomBall(int screenWidth, int screenHeight, double speedMultiplier, double targetX, double targetY, double spread) {
         // 공 타입 무작위 결정 (70% 일반, 20% 고속, 10% 대형)
         int roll = RANDOM.nextInt(100);
         BallType type;
@@ -95,7 +96,6 @@ public class Ball {
 
         // 목표 위치: 플레이어 위치 근처 또는 화면 내부 무작위 지점
         // 플레이어를 완전히 정조준하면 피하기 어려우므로 오프셋(편차) 적용
-        double spread = 120.0;
         double aimX = targetX + (RANDOM.nextDouble() * 2 - 1) * spread;
         double aimY = targetY + (RANDOM.nextDouble() * 2 - 1) * spread;
 
@@ -168,6 +168,10 @@ public class Ball {
 
     public double getRadius() {
         return radius;
+    }
+
+    public Color getColor() {
+        return color;
     }
 
     public BallType getType() {
