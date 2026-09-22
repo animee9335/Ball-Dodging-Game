@@ -1,13 +1,11 @@
 package com.dodging.game.ui;
 
 import com.dodging.game.model.GameState;
+import com.dodging.game.model.Player;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
+import java.awt.event.*;
 
 /**
  * 게임 메인 렌더링 및 게임 루프를 처리하는 패널
@@ -21,20 +19,76 @@ public class GamePanel extends JPanel implements ActionListener {
     private final Timer gameTimer;
     private GameState gameState = GameState.READY;
 
+    // 플레이어 객체
+    private final Player player;
+
+    // 키 입력 플래그
+    private boolean upPressed = false;
+    private boolean downPressed = false;
+    private boolean leftPressed = false;
+    private boolean rightPressed = false;
+
     public GamePanel() {
         setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
         setBackground(new Color(24, 26, 32));
         setFocusable(true);
 
+        player = new Player(PANEL_WIDTH / 2.0, PANEL_HEIGHT / 2.0);
+
         gameTimer = new Timer(DELAY, this);
         gameTimer.start();
 
+        // 키 이벤트 리스너 등록
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 handleGlobalKey(e.getKeyCode());
+                handleMovementKey(e.getKeyCode(), true);
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                handleMovementKey(e.getKeyCode(), false);
             }
         });
+
+        // 포커스를 잃었을 때 키 상태 초기화 (계속 이동하는 현상 방지)
+        addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                resetKeyStates();
+            }
+        });
+    }
+
+    private void handleMovementKey(int keyCode, boolean isPressed) {
+        switch (keyCode) {
+            case KeyEvent.VK_UP:
+            case KeyEvent.VK_W:
+                upPressed = isPressed;
+                break;
+            case KeyEvent.VK_DOWN:
+            case KeyEvent.VK_S:
+                downPressed = isPressed;
+                break;
+            case KeyEvent.VK_LEFT:
+            case KeyEvent.VK_A:
+                leftPressed = isPressed;
+                break;
+            case KeyEvent.VK_RIGHT:
+            case KeyEvent.VK_D:
+                rightPressed = isPressed;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void resetKeyStates() {
+        upPressed = false;
+        downPressed = false;
+        leftPressed = false;
+        rightPressed = false;
     }
 
     private void handleGlobalKey(int keyCode) {
@@ -45,6 +99,7 @@ public class GamePanel extends JPanel implements ActionListener {
         } else if (gameState == GameState.PLAYING) {
             if (keyCode == KeyEvent.VK_P) {
                 gameState = GameState.PAUSED;
+                resetKeyStates();
                 repaint();
             }
         } else if (gameState == GameState.PAUSED) {
@@ -59,6 +114,8 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     public void startGame() {
+        player.reset(PANEL_WIDTH / 2.0, PANEL_HEIGHT / 2.0);
+        resetKeyStates();
         gameState = GameState.PLAYING;
     }
 
@@ -70,6 +127,10 @@ public class GamePanel extends JPanel implements ActionListener {
         this.gameState = gameState;
     }
 
+    public Player getPlayer() {
+        return player;
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         if (gameState == GameState.PLAYING) {
@@ -79,7 +140,8 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     private void updateGame() {
-        // 추후 플레이어 및 공 업데이트 로직 연결
+        // 플레이어 위치 업데이트 (방향키 조작)
+        player.update(upPressed, downPressed, leftPressed, rightPressed, PANEL_WIDTH, PANEL_HEIGHT);
     }
 
     @Override
@@ -91,7 +153,14 @@ public class GamePanel extends JPanel implements ActionListener {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
+        // 게임 화면 및 플레이어 렌더링
+        if (gameState != GameState.READY) {
+            player.draw(g2d);
+        }
+
+        // 상태별 오버레이 화면 렌더링
         if (gameState == GameState.READY) {
+            player.draw(g2d);
             drawReadyScreen(g2d);
         } else if (gameState == GameState.PAUSED) {
             drawPausedScreen(g2d);
@@ -101,6 +170,9 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     private void drawReadyScreen(Graphics2D g2d) {
+        g2d.setColor(new Color(0, 0, 0, 160));
+        g2d.fillRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT);
+
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Malgun Gothic", Font.BOLD, 40));
         drawCenteredString(g2d, "공피하기 게임 (Ball Dodging)", PANEL_HEIGHT / 2 - 60);
